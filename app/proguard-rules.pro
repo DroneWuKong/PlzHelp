@@ -1,0 +1,4 @@
+-keep class com.orqa.chat.data.** { *; }
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn okio.**
