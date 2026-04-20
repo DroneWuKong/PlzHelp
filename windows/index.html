@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORQA Doc Chat</title>
+<style>
+  :root {
+    --bg:      #0f0f10;
+    --surface: #1a1a1c;
+    --surface2:#222225;
+    --border:  #2e2e32;
+    --border2: #3e3e44;
+    --text:    #e8e8ea;
+    --muted:   #888890;
+    --dim:     #555560;
+    --orange:  #E8610A;
+    --blue-bg: #0d1829;
+    --blue-bd: #1e3a5f;
+    --blue-tx: #a8c8f8;
+    --green:   #22c55e;
+    --red:     #ef4444;
+    --mono:    'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--mono)}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+
+  .shell{width:100%;max-width:820px;height:calc(100vh - 32px);display:flex;flex-direction:column;border:0.5px solid var(--border);border-radius:10px;overflow:hidden;position:relative}
+
+  /* ── Header ── */
+  .hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid var(--border);background:var(--surface);flex-shrink:0}
+  .logo{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--orange)}
+  .hdr-sep{color:var(--dim)}
+  .hdr-title{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .provider-badge{font-size:10px;padding:2px 8px;border-radius:3px;border:0.5px solid var(--border2);color:var(--muted);letter-spacing:.04em;cursor:pointer;transition:all .15s}
+  .provider-badge:hover{border-color:var(--orange);color:var(--orange)}
+  .status-pill{display:flex;align-items:center;gap:5px;margin-left:auto;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0}
+  .dot.ready{background:var(--green)}
+  .dot.spin{background:var(--orange);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .mode-toggle{display:flex;border:0.5px solid var(--border2);border-radius:5px;overflow:hidden;margin-left:8px}
+  .mode-btn{font-size:10px;font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:4px 11px;border:none;cursor:pointer;background:transparent;color:var(--dim);transition:all .15s}
+  .mode-btn.active{background:var(--orange);color:#fff}
+  .settings-btn{width:28px;height:28px;border:0.5px solid var(--border2);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;margin-left:4px;transition:all .15s}
+  .settings-btn:hover{border-color:var(--orange);color:var(--orange)}
+
+  /* ── Settings drawer ── */
+  .drawer-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:10;display:none}
+  .drawer-overlay.open{display:block}
+  .drawer{position:absolute;top:0;right:0;bottom:0;width:320px;background:var(--surface);border-left:0.5px solid var(--border2);z-index:11;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s ease}
+  .drawer.open{transform:translateX(0)}
+  .drawer-hdr{display:flex;align-items:center;padding:12px 14px;border-bottom:0.5px solid var(--border);flex-shrink:0}
+  .drawer-title{font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+  .drawer-close{margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1}
+  .drawer-close:hover{color:var(--text)}
+  .drawer-body{flex:1;overflow-y:auto;padding:14px}
+  .drawer-section{margin-bottom:18px}
+  .drawer-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  .provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .prov-card{padding:8px 10px;border:0.5px solid var(--border2);border-radius:6px;cursor:pointer;transition:all .15s;background:var(--bg)}
+  .prov-card:hover{border-color:var(--border2);background:var(--surface2)}
+  .prov-card.selected{border-color:var(--orange);background:rgba(232,97,10,.08)}
+  .prov-card-name{font-size:11px;font-weight:500;color:var(--text);margin-bottom:2px}
+  .prov-card-desc{font-size:10px;color:var(--dim);line-height:1.4}
+  .prov-card-badge{font-size:9px;padding:1px 5px;border-radius:2px;margin-top:4px;display:inline-block}
+  .badge-free{background:#0f2a0f;color:#4ade80;border:0.5px solid #1a4a1a}
+  .badge-offline{background:#1a1208;color:#fb923c;border:0.5px solid #3a2510}
+  .badge-paid{background:#1a1229;color:#818cf8;border:0.5px solid #2a2249}
+
+  .model-grid{display:flex;flex-direction:column;gap:5px}
+  .model-opt{padding:7px 10px;border:0.5px solid var(--border2);border-radius:5px;cursor:pointer;font-size:11px;color:var(--muted);background:var(--bg);transition:all .12s;display:flex;align-items:center;justify-content:space-between}
+  .model-opt:hover{border-color:var(--border2);color:var(--text)}
+  .model-opt.selected{border-color:var(--orange);color:var(--orange);background:rgba(232,97,10,.06)}
+  .model-size{font-size:9.5px;color:var(--dim)}
+
+  .key-input-wrap{position:relative}
+  .key-input{width:100%;padding:8px 36px 8px 10px;border:0.5px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;outline:none}
+  .key-input:focus{border-color:var(--orange)}
+  .key-input::placeholder{color:var(--dim)}
+  .key-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:13px}
+  .key-hint{font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .key-hint a{color:#60a5fa;text-decoration:none}
+  .key-hint a:hover{text-decoration:underline}
+
+  .apply-btn{width:100%;padding:9px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:4px}
+  .apply-btn:hover{opacity:.9}
+  .apply-status{font-size:10px;margin-top:6px;text-align:center;color:var(--dim);min-height:14px}
+  .apply-status.ok{color:var(--green)}
+  .apply-status.err{color:var(--red)}
+
+  /* ── Folders bar ── */
+  .folders-bar{flex-shrink:0;border-bottom:0.5px solid var(--border);background:var(--bg)}
+  .folders-toggle{display:flex;align-items:center;gap:8px;padding:5px 14px;cursor:pointer;user-select:none}
+  .folders-label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .folders-summary{font-size:10px;color:var(--muted)}
+  .folders-summary b{color:var(--orange);font-weight:500}
+  .chevron{font-size:10px;color:var(--dim);margin-left:auto;transition:transform .15s;display:inline-block}
+  .chevron.open{transform:rotate(180deg)}
+  .folders-detail{display:none;padding:0 14px 8px}
+  .folders-detail.open{display:block}
+  .folder-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;color:var(--muted);border-top:0.5px solid var(--border)}
+  .folder-row:first-child{border-top:none}
+  .folder-label-tag{font-size:9.5px;padding:1px 6px;border-radius:3px;background:#1a1a10;border:0.5px solid #3a3a20;color:#aaa060;letter-spacing:.04em;flex-shrink:0}
+  .folder-path{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .folder-stats{font-size:10px;color:var(--dim);white-space:nowrap;margin-left:auto}
+
+  /* ── Messages ── */
+  .msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  .msg{display:flex;flex-direction:column;max-width:90%}
+  .msg.user{align-self:flex-end;align-items:flex-end}
+  .msg.assistant{align-self:flex-start;align-items:flex-start}
+  .sender{font-size:9.5px;color:var(--dim);margin-bottom:3px;letter-spacing:.08em;text-transform:uppercase}
+  .bubble{padding:9px 13px;border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .msg.user .bubble{background:var(--blue-bg);border:0.5px solid var(--blue-bd);color:var(--blue-tx);border-bottom-right-radius:2px}
+  .msg.assistant .bubble{background:var(--surface);border:0.5px solid var(--border);color:var(--text);border-bottom-left-radius:2px}
+  .msg.assistant.engcall .bubble{border-left:2px solid var(--orange)}
+  .sources{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .src-tag{font-size:9.5px;padding:2px 7px;border-radius:3px;background:#1a1208;border:0.5px solid #3a2510;color:#a05010;letter-spacing:.03em;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .copy-btn{font-size:9.5px;font-family:var(--mono);margin-top:4px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:3px;background:transparent;color:var(--dim);cursor:pointer;letter-spacing:.05em}
+  .copy-btn:hover{border-color:var(--orange);color:var(--orange)}
+  .typing-indicator{display:flex;align-items:center;gap:4px;padding:9px 13px}
+  .typing-indicator span{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+  .typing-indicator span:nth-child(2){animation-delay:.2s}
+  .typing-indicator span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+  /* ── Chips ── */
+  .chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 8px;flex-shrink:0}
+  .chip{font-size:10.5px;font-family:var(--mono);padding:3px 9px;border-radius:4px;border:0.5px solid var(--border2);color:var(--muted);background:var(--surface);cursor:pointer;letter-spacing:.03em;transition:all .12s}
+  .chip:hover{border-color:var(--orange);color:var(--orange)}
+
+  /* ── Input ── */
+  .input-row{display:flex;align-items:flex-end;gap:8px;padding:9px 12px;border-top:0.5px solid var(--border);background:var(--surface);flex-shrink:0}
+  textarea{flex:1;resize:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:var(--mono);background:var(--bg);color:var(--text);line-height:1.4;min-height:36px;max-height:100px;outline:none}
+  textarea:focus{border-color:var(--orange)}
+  textarea::placeholder{color:var(--dim)}
+  textarea:disabled{opacity:.4}
+  .send-btn{background:var(--orange);color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:11px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;cursor:pointer;flex-shrink:0;height:36px;text-transform:uppercase}
+  .send-btn:disabled{opacity:.35;cursor:default}
+
+  .init-msg{text-align:center;padding:48px 24px;color:var(--dim);font-size:13px;line-height:2}
+  .init-msg b{color:var(--orange)}
+
+  /* Image upload */
+  .img-btn{width:34px;height:34px;border:0.5px solid var(--border2);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;position:relative}
+  .img-btn:hover{border-color:var(--orange);color:var(--orange)}
+  .img-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .img-preview-wrap{flex-shrink:0;padding:6px 12px 0;display:none}
+  .img-preview-wrap.has-image{display:flex;align-items:center;gap:8px}
+  .img-preview{width:48px;height:48px;object-fit:cover;border-radius:4px;border:0.5px solid var(--border2)}
+  .img-clear{background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:16px;padding:0;line-height:1}
+  .img-clear:hover{color:var(--red)}
+  .img-label{font-size:10px;color:var(--dim);letter-spacing:.04em}
+  .msg-image{max-width:200px;border-radius:5px;margin-bottom:5px;border:0.5px solid var(--border2)}
+  .category-tag{font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(232,97,10,.1);border:0.5px solid rgba(232,97,10,.3);color:var(--orange);letter-spacing:.04em;margin-top:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Header -->
+  <div class="hdr">
+    <span class="logo">ORQA</span>
+    <span class="hdr-sep">/</span>
+    <span class="hdr-title">Doc Chat</span>
+    <span class="provider-badge" id="provider-badge" onclick="openDrawer()" title="Click to change model">connecting...</span>
+    <div class="status-pill">
+      <div class="dot spin" id="status-dot"></div>
+      <span id="status-text">Indexing...</span>
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-ts" onclick="setMode('troubleshoot')">Troubleshoot</button>
+      <button class="mode-btn" id="btn-ec" onclick="setMode('engcall')">Eng Call</button>
+    </div>
+    <button class="settings-btn" onclick="openDrawer()" title="Model settings">⚙</button>
+  </div>
+
+  <!-- Folder info bar -->
+  <div class="folders-bar">
+    <div class="folders-toggle" onclick="toggleFolders()">
+      <span class="folders-label">Sources</span>
+      <span class="folders-summary" id="folders-summary">Scanning...</span>
+      <span class="chevron" id="chevron">▾</span>
+    </div>
+    <div class="folders-detail" id="folders-detail"></div>
+  </div>
+
+  <!-- Messages -->
+  <div class="msgs" id="messages">
+    <div class="init-msg" id="init-msg">
+      <b>Building index...</b><br>
+      Scanning your docs folder now.<br>
+      Status dot goes green when ready.
+    </div>
+  </div>
+
+  <!-- Chips -->
+  <div class="chips" id="chips" style="display:none">
+    <div class="chip" onclick="fill('QuadCore H7 won\'t arm in Betaflight')">QuadCore won't arm</div>
+    <div class="chip" onclick="fill('WingCore H7 Timer5 motor outputs CAN bus bug')">WingCore motors dead</div>
+    <div class="chip" onclick="fill('IMU rotation values dual ICM-42688-P')">IMU rotations</div>
+    <div class="chip" onclick="fill('H503 GPDMA OSD line buffer architecture')">H503 GPDMA</div>
+    <div class="chip" onclick="fill('SPI3 pin assignments H743 to H503')">SPI3 pins</div>
+    <div class="chip" onclick="fill('3030 ESC BLHeli desync DShot')">ESC desync</div>
+  </div>
+
+  <!-- Image preview -->
+  <div class="img-preview-wrap" id="img-preview-wrap">
+    <img class="img-preview" id="img-preview" src="" alt="attached image" />
+    <div>
+      <div class="img-label">Image attached</div>
+      <button class="img-clear" onclick="clearImage()" title="Remove image">×</button>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-row">
+    <textarea id="input" placeholder="Ask anything — searching your local docs..." rows="1"
+      onkeydown="handleKey(event)" oninput="autoResize(this)" disabled></textarea>
+    <div class="img-btn" title="Attach image (photo of your board, wiring, etc.)">
+      📷
+      <input type="file" accept="image/*" onchange="attachImage(event)" id="img-file-input" />
+    </div>
+    <button class="send-btn" id="send-btn" disabled onclick="send()">Send</button>
+  </div>
+
+  <!-- Settings drawer overlay -->
+  <div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+
+  <!-- Settings drawer -->
+  <div class="drawer" id="drawer">
+    <div class="drawer-hdr">
+      <span class="drawer-title">Model Settings</span>
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- Provider selection -->
+      <div class="drawer-section">
+        <div class="drawer-label">Provider</div>
+        <div class="provider-grid">
+          <div class="prov-card selected" id="prov-ollama" onclick="selectProvider('ollama')">
+            <div class="prov-card-name">Ollama</div>
+            <div class="prov-card-desc">Local models, fully offline</div>
+            <span class="prov-card-badge badge-offline">offline</span>
+            <span class="prov-card-badge badge-free">free</span>
+          </div>
+          <div class="prov-card" id="prov-gemini" onclick="selectProvider('gemini')">
+            <div class="prov-card-name">Gemini</div>
+            <div class="prov-card-desc">Google AI Studio, fast</div>
+            <span class="prov-card-badge badge-free">free tier</span>
+          </div>
+          <div class="prov-card" id="prov-anthropic-haiku" onclick="selectProvider('anthropic','claude-haiku-4-5-20251001')">
+            <div class="prov-card-name">Claude Haiku</div>
+            <div class="prov-card-desc">Fastest Claude, very cheap</div>
+            <span class="prov-card-badge badge-paid">~$0.001/msg</span>
+          </div>
+          <div class="prov-card" id="prov-anthropic" onclick="selectProvider('anthropic','claude-sonnet-4-20250514')">
+            <div class="prov-card-name">Claude Sonnet</div>
+            <div class="prov-card-desc">Best quality answers</div>
+            <span class="prov-card-badge badge-paid">~$0.01/msg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ollama model selection (shown for Ollama only) -->
+      <div class="drawer-section" id="ollama-models-section">
+        <div class="drawer-label">Ollama Model</div>
+        <div class="model-grid">
+          <div class="model-opt selected" id="model-llama3.2" onclick="selectModel('llama3.2')">
+            llama3.2 <span class="model-size">2GB — balanced</span>
+          </div>
+          <div class="model-opt" id="model-phi3.5" onclick="selectModel('phi3.5')">
+            phi3.5 <span class="model-size">2.2GB — fast</span>
+          </div>
+          <div class="model-opt" id="model-gemma2:2b" onclick="selectModel('gemma2:2b')">
+            gemma2:2b <span class="model-size">1.6GB — fastest</span>
+          </div>
+          <div class="model-opt" id="model-mistral" onclick="selectModel('mistral')">
+            mistral <span class="model-size">4GB — stronger</span>
+          </div>
+          <div class="model-opt" id="model-deepseek-r1:8b" onclick="selectModel('deepseek-r1:8b')">
+            deepseek-r1:8b <span class="model-size">5GB — technical</span>
+          </div>
+          <div class="model-opt" id="model-llama3.1:70b" onclick="selectModel('llama3.1:70b')">
+            llama3.1:70b <span class="model-size">40GB — best local</span>
+          </div>
+        </div>
+        <div class="key-hint" style="margin-top:8px">
+          Pull models with: <code>ollama pull MODEL_NAME</code>
+        </div>
+      </div>
+
+      <!-- Gemini model selection -->
+      <div class="drawer-section" id="gemini-models-section" style="display:none">
+        <div class="drawer-label">Gemini Model</div>
+        <div class="model-grid">
+          <div class="model-opt selected" id="model-gemini-2.0-flash" onclick="selectModel('gemini-2.0-flash')">
+            gemini-2.0-flash <span class="model-size">free tier — fast</span>
+          </div>
+          <div class="model-opt" id="model-gemini-2.5-flash" onclick="selectModel('gemini-2.5-flash-preview-05-20')">
+            gemini-2.5-flash <span class="model-size">free tier — smarter</span>
+          </div>
+          <div class="model-opt" id="model-gemini-2.5-pro" onclick="selectModel('gemini-2.5-pro-preview-05-06')">
+            gemini-2.5-pro <span class="model-size">paid — best Gemini</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Key input (hidden for Ollama) -->
+      <div class="drawer-section" id="key-section" style="display:none">
+        <div class="drawer-label" id="key-label">API Key</div>
+        <div class="key-input-wrap">
+          <input class="key-input" type="password" id="api-key-input" placeholder="Paste your key here..." />
+          <button class="key-toggle" onclick="toggleKeyVis()">👁</button>
+        </div>
+        <div class="key-hint" id="key-hint"></div>
+      </div>
+
+      <button class="apply-btn" onclick="applySettings()">Apply Settings</button>
+      <div class="apply-status" id="apply-status"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+let mode     = 'troubleshoot';
+let history  = [];
+let loading  = false;
+let ready    = false;
+let foldersOpen = false;
+let attachedImage = null; // {data: base64, media_type: string}
+
+// Settings state
+let selProvider = 'ollama';
+let selModel    = 'llama3.2';
+
+// ── Image handling ────────────────────────────────────────────────
+function attachImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const base64  = dataUrl.split(",")[1];
+    const mediaType = file.type || "image/jpeg";
+    attachedImage = { data: base64, media_type: mediaType };
+    document.getElementById("img-preview").src = dataUrl;
+    document.getElementById("img-preview-wrap").classList.add("has-image");
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  attachedImage = null;
+  document.getElementById("img-preview").src = "";
+  document.getElementById("img-preview-wrap").classList.remove("has-image");
+  document.getElementById("img-file-input").value = "";
+}
+
+// ── Drawer ─────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function selectProvider(p, forceModel) {
+  selProvider = p;
+  // Clear all selected
+  ['ollama','gemini','anthropic-haiku','anthropic'].forEach(id => {
+    document.getElementById('prov-'+id)?.classList.remove('selected');
+  });
+  // Select clicked
+  const cardId = p === 'anthropic' && forceModel === 'claude-haiku-4-5-20251001'
+    ? 'anthropic-haiku' : p;
+  document.getElementById('prov-'+cardId)?.classList.add('selected');
+
+  // Show/hide model sections
+  document.getElementById('ollama-models-section').style.display  = p === 'ollama'   ? 'block' : 'none';
+  document.getElementById('gemini-models-section').style.display  = p === 'gemini'   ? 'block' : 'none';
+  document.getElementById('key-section').style.display            = p !== 'ollama'   ? 'block' : 'none';
+
+  // Set default model for provider
+  if (forceModel) {
+    selModel = forceModel;
+  } else if (p === 'gemini') {
+    selModel = 'gemini-2.0-flash';
+    highlightModel('gemini-2.0-flash');
+  } else if (p === 'anthropic') {
+    selModel = 'claude-sonnet-4-20250514';
+  }
+
+  // Update key hint
+  const hints = {
+    gemini:    'Get a free key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a> — same key Wingman uses.',
+    anthropic: 'Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>',
+  };
+  const labelMap = {
+    gemini:    'Google AI Studio Key  (AIzaSy...)',
+    anthropic: 'Anthropic API Key  (sk-ant-...)',
+  };
+  document.getElementById('key-hint').innerHTML  = hints[p]    || '';
+  document.getElementById('key-label').textContent = labelMap[p] || 'API Key';
+}
+
+function selectModel(m) {
+  selModel = m;
+  highlightModel(m);
+}
+
+function highlightModel(m) {
+  document.querySelectorAll('.model-opt').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('model-'+m);
+  if (el) el.classList.add('selected');
+}
+
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function applySettings() {
+  const key    = document.getElementById('api-key-input').value.trim();
+  const status = document.getElementById('apply-status');
+  status.className = 'apply-status';
+  status.textContent = 'Applying...';
+
+  try {
+    const r = await fetch('/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ provider: selProvider, model: selModel, api_key: key || undefined })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.className = 'apply-status ok';
+      status.textContent = `✓ Now using ${d.provider} / ${d.model}`;
+      updateProviderBadge(d.provider, d.model);
+      history = []; // clear conversation when switching models
+      setTimeout(closeDrawer, 800);
+    } else {
+      throw new Error(d.error || 'Unknown error');
+    }
+  } catch(e) {
+    status.className = 'apply-status err';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+function updateProviderBadge(provider, model) {
+  const shortModel = model.split('-').slice(0,3).join('-');
+  document.getElementById('provider-badge').textContent = `${provider} / ${shortModel}`;
+}
+
+// ── Status polling ─────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+
+    updateProviderBadge(d.provider, d.model);
+
+    const summary = document.getElementById('folders-summary');
+    summary.innerHTML = d.folders.map(f =>
+      `<b>${f.label}</b> (${f.files} files)`
+    ).join(' &nbsp;·&nbsp; ') + ` &nbsp;·&nbsp; ${d.total_chunks} chunks`;
+
+    const detail = document.getElementById('folders-detail');
+    detail.innerHTML = d.folders.map(f => `
+      <div class="folder-row">
+        <span class="folder-label-tag">${f.label}</span>
+        <span class="folder-path" title="${f.path}">${f.path}</span>
+        <span class="folder-stats">${f.files} files · ${f.chunks} chunks</span>
+      </div>`).join('');
+
+    if (d.ready) {
+      document.getElementById('status-dot').className = 'dot ready';
+      document.getElementById('status-text').textContent = 'Ready';
+      if (!ready) {
+        ready = true;
+        document.getElementById('input').disabled    = false;
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('chips').style.display = 'flex';
+        document.getElementById('init-msg')?.remove();
+        const srcList = d.folders.map(f => `${f.label} (${f.files} files)`).join(', ');
+        appendMsg('assistant',
+          `Ready. ${d.total_files} files indexed across ${d.folders.length} source(s): ${srcList}.\n\nClick ⚙ to switch models. Currently using ${d.provider} / ${d.model}.`,
+          null);
+      }
+    } else {
+      setTimeout(pollStatus, 1000);
+    }
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'Server offline';
+    setTimeout(pollStatus, 2000);
+  }
+}
+
+// ── Chat ───────────────────────────────────────────────────────────
+function toggleFolders() {
+  foldersOpen = !foldersOpen;
+  document.getElementById('folders-detail').classList.toggle('open', foldersOpen);
+  document.getElementById('chevron').classList.toggle('open', foldersOpen);
+}
+
+function setMode(m) {
+  mode = m; history = [];
+  document.getElementById('btn-ts').classList.toggle('active', m === 'troubleshoot');
+  document.getElementById('btn-ec').classList.toggle('active', m === 'engcall');
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function fill(text) {
+  const el = document.getElementById('input');
+  el.value = text; autoResize(el); el.focus();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+function appendMsg(role, text, sources, category) {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role + (role === 'assistant' && mode === 'engcall' ? ' engcall' : '');
+  const sender = document.createElement('span');
+  sender.className = 'sender';
+  sender.textContent = role === 'user' ? 'You' : 'ORQA AI';
+  // Show attached image above bubble if present
+  if (role === 'user' && attachedImage) {
+    const imgEl = document.createElement('img');
+    imgEl.src = `data:${attachedImage.media_type};base64,${attachedImage.data}`;
+    imgEl.className = 'msg-image';
+    wrap.appendChild(imgEl);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(sender);
+  wrap.appendChild(bubble);
+  if (sources && sources.length) {
+    const sf = document.createElement('div');
+    sf.className = 'sources';
+    sources.slice(0, 8).forEach(s => {
+      const t = document.createElement('span');
+      t.className = 'src-tag'; t.title = s; t.textContent = s;
+      sf.appendChild(t);
+    });
+    wrap.appendChild(sf);
+  }
+  if (category && role === 'assistant') {
+    const ct = document.createElement('span');
+    ct.className = 'category-tag';
+    ct.textContent = category;
+    wrap.appendChild(ct);
+  }
+  if (role === 'assistant') {
+    const cp = document.createElement('button');
+    cp.className = 'copy-btn'; cp.textContent = 'Copy';
+    cp.onclick = () => { navigator.clipboard.writeText(text); cp.textContent = 'Copied'; setTimeout(() => cp.textContent = 'Copy', 1500); };
+    wrap.appendChild(cp);
+  }
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.id = 'typing'; d.className = 'msg assistant';
+  d.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function send() {
+  const input = document.getElementById('input');
+  const text  = input.value.trim();
+  if (!text || loading || !ready) return;
+  document.getElementById('chips').style.display = 'none';
+  loading = true;
+  document.getElementById('send-btn').disabled = true;
+  input.value = ''; input.style.height = 'auto';
+  appendMsg('user', text, null);
+  history.push({ role: 'user', content: text });
+  showTyping();
+  try {
+    const body = { messages: history, mode };
+    if (attachedImage) body.image = attachedImage;
+    const r = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    document.getElementById('typing')?.remove();
+    const reply = d.error ? `Error: ${d.error}` : d.reply;
+    appendMsg('assistant', reply, d.sources || null, d.category || null);
+    if (!d.error) history.push({ role: 'assistant', content: reply });
+    clearImage();
+  } catch(e) {
+    document.getElementById('typing')?.remove();
+    appendMsg('assistant', 'Could not reach server. Is server.py running?', null);
+  }
+  loading = false;
+  document.getElementById('send-btn').disabled = false;
+  input.focus();
+}
+
+pollStatus();
+</script>
+</body>
+</html>
