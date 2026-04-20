@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.OrqaChat" parent="android:Theme.Material.NoTitleBar">
+        <item name="android:statusBarColor">#0F0F10</item>
+        <item name="android:navigationBarColor">#0F0F10</item>
+        <item name="android:windowBackground">#0F0F10</item>
+    </style>
+</resources>
