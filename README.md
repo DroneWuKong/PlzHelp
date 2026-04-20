@@ -1,99 +1,70 @@
-# ORQA Chat — Android App
+# PlzHelp — ORQA Doc Chat
 
-Offline-capable AI chat over your ORQA documentation.
-Runs on Android 8+ (API 26+). No Play Store required — sideload the APK.
+AI-powered chat over your ORQA documentation. Two versions — pick what fits your situation.
 
 ---
 
-## What it does
+## Android app  (`/` root)
 
-- Pulls docs from your GitHub repos and public databases over WiFi
-- Caches everything locally in Room DB — works fully offline after first sync
-- BM25 search over cached docs — same algorithm as the Python server
-- Sends top matching chunks to Gemini / Claude / local server for answers
+Fully standalone Android app. No laptop required.
+
+- Pulls docs from GitHub repos and public databases over WiFi
+- Caches everything locally — works fully offline after first sync
+- BM25 search + Gemini / Claude / local server for answers
 - Image attach — photo your board and ask about it
 - Engineer Call mode — short answers for phone calls
-- Dark tactical HUD UI matching the Forge/Wingman aesthetic
+
+**Requirements:** Android Studio, JDK 17, Android SDK 34
+
+**Build:** Open the root folder in Android Studio → Build → Generate Signed APK → sideload to phone
+
+**First run:**
+1. Settings → paste Gemini key (free at aistudio.google.com)
+2. Settings → paste GitHub token for private repo access
+3. Sync → Sync All
+4. Done
 
 ---
 
-## Build requirements
+## Windows desktop  (`/windows/`)
 
-- Android Studio Hedgehog (2023.1.1) or newer
-- JDK 17
-- Android SDK 34
+Python server + browser UI. Runs on your laptop.
 
----
+- Drop docs into `windows/docs/` folder
+- Watches for file changes and re-indexes automatically
+- Selectable LLM: Gemini, Claude, Ollama (offline), LM Studio
+- Multi-folder support — point at GitHub repos, manual folders, anywhere
+- PDF processing pipeline — converts manuals to clean markdown
+- Wingman AI knowledge extraction — pulls FALLBACK_KB, WIRING_KB, category map
+- Engineer Call mode
 
-## How to build
+**Requirements:** Python 3.12+, Ollama (optional for offline)
 
-1. Open Android Studio
-2. File → Open → select the `orqa-android` folder
-3. Wait for Gradle sync to finish (downloads dependencies, ~2 min first time)
-4. Build → Generate Signed Bundle/APK → APK
-5. Use debug key for sideloading, or create a keystore for a proper signed APK
-
-To sideload on your phone:
-- Enable Developer Options on Android (Settings → About → tap Build Number 7 times)
-- Enable "Install from unknown sources" or "Install unknown apps"
-- Transfer the APK to your phone and tap it to install
-
----
-
-## First run
-
-1. Open the app
-2. Tap ⚙ Settings
-3. Paste your Gemini API key (free at aistudio.google.com)
-4. Paste your GitHub token if you want private repo sync
-5. Tap Save
-6. Tap the Sync icon → Sync All
-7. Wait for indexing to finish
-8. Ask anything
-
----
-
-## Data sources
-
-The app comes pre-configured with:
-- Forge Troubleshooting KB (public, no key needed)
-- Drone Integration Handbook (public GitHub repo)
-- DroneClear Forge (private, needs GitHub token)
-- ORQA PX4 Port (private, needs GitHub token)
-
-Add more in the Sync screen — GitHub repos or any public URL.
-
----
-
-## Offline use
-
-After syncing once over WiFi, all chunks are cached in Room DB on the device.
-The app works fully offline for chat (search + LLM calls use the cached data).
-Gemini/Claude still need internet for the actual LLM call.
-
-For fully air-gapped use, point Settings → Local Server URL at a laptop
-running server.py with Ollama on the same WiFi network.
-
----
-
-## Project structure
-
+**Quick start:**
 ```
-app/src/main/kotlin/com/orqa/chat/
-  MainActivity.kt          Navigation host
-  data/
-    Database.kt            Room entities + DAOs
-    AppDatabase.kt         Room DB singleton + SettingsStore
-  llm/
-    LlmService.kt          Gemini, Claude, local server calls
-  sync/
-    SyncManager.kt         GitHub API + public URL fetching + chunking
-  search/
-    SearchEngine.kt        BM25 + category boosting
-  ui/
-    ChatViewModel.kt       All business logic
-    ChatScreen.kt          Main chat UI
-    SyncScreen.kt          Data source management
-    SettingsScreen.kt      Keys + provider selection
-    theme/Theme.kt         Dark ORQA color palette
+cd windows
+pip install -r requirements.txt
+python server.py --offline        # Ollama
+python server.py --key sk-ant-... # Claude
 ```
+Then open http://localhost:5000
+
+**Batch files (double-click):**
+- `SETUP.bat` — installs everything including Ollama
+- `SYNC.bat` — pulls latest from your GitHub repos into docs/
+- `START.bat` — starts the server (offline/Ollama)
+- `START_WITH_KEY.bat` — starts with Claude API key
+- `PROCESS_PDFS.bat` — converts PDFs to better search format
+- `TEST.bat` — diagnoses any setup issues
+
+---
+
+## Shared features
+
+Both versions use the same core architecture:
+- BM25 keyword search with category boosting (15 categories: wiring, motors, ESC, video, radio, GPS, battery, firmware, PID, ORQA, crash, build, compliance, platform, frame)
+- Wingman AI knowledge base integration (FALLBACK_KB, WIRING_KB, ORQA mode KB)
+- Forge troubleshooting database (58 diagnosed entries)
+- Drone Integration Handbook (55 component pages + 7 firmware pages + 9 field guides)
+- ORQA PX4 port context (QuadCore H7, WingCore H7 board definitions)
+- Two chat modes: Troubleshoot (detailed) and Engineer Call (short, verbally relayable)
